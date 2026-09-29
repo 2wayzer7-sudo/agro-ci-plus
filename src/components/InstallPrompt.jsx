@@ -33,8 +33,12 @@ const banner = {
 }
 
 function InstallPrompt() {
-  const { canInstall, install } = useInstallPrompt()
+  const { canInstall, install, dismiss } = useInstallPrompt()
 
+  /* canInstall est déjà faux après installation, refus, ou en mode
+     standalone : le composant ne rend alors strictement rien. Le
+     AnimatePresence reste monté pour animer la sortie sans casser le
+     layout des écrans. */
   return (
     <AnimatePresence initial={false}>
       {canInstall && (
@@ -61,6 +65,16 @@ function InstallPrompt() {
             transition={{ type: 'spring', stiffness: 420, damping: 17 }}
           >
             Installer
+          </motion.button>
+          <motion.button
+            type="button"
+            className="install-dismiss"
+            onClick={dismiss}
+            aria-label="Ne plus proposer l’installation"
+            whileTap={{ scale: 0.9 }}
+            transition={{ type: 'spring', stiffness: 420, damping: 17 }}
+          >
+            Plus tard
           </motion.button>
         </motion.aside>
       )}

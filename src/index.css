@@ -418,6 +418,22 @@ button:active::after { opacity: 1; transition-duration: 60ms; }
 }
 :root[data-theme="dark"] .install-button { color: #0A1512; }
 
+/* « Plus tard » : moins saillant que « Installer », même grammatique. */
+.install-dismiss {
+  position: relative;
+  min-height: 40px;
+  padding: 8px 6px;
+  color: var(--text-3);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-m);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.install-dismiss:hover { color: var(--text-2); }
+:root[data-theme="dark"] .install-dismiss { color: var(--text-2); }
+
 .intro-block { margin: 42px 0 22px; }
 .kicker, .eyebrow {
   margin: 0 0 6px;
