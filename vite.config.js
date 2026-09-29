@@ -23,16 +23,18 @@ export default defineConfig({
         lang: 'fr',
         icons: [
           {
-            src: '/icons/icon-192.svg',
-            sizes: '192x192',
-            type: 'image/svg+xml',
-            purpose: 'any maskable'
+            src: '/assets/logo-light.png',
+            sizes: '1024x1024',
+            type: 'image/png',
+            purpose: 'any maskable',
+            media: '(prefers-color-scheme: light)'
           },
           {
-            src: '/icons/icon-512.svg',
-            sizes: '512x512',
-            type: 'image/svg+xml',
-            purpose: 'any maskable'
+            src: '/assets/logo-dark.png',
+            sizes: '1024x1024',
+            type: 'image/png',
+            purpose: 'any maskable',
+            media: '(prefers-color-scheme: dark)'
           }
         ]
       },
