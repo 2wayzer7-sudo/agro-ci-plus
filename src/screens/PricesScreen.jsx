@@ -9,7 +9,10 @@ function PricesScreen() {
     <section className="screen prices-screen">
       <header className="screen-header">
         <div className="brand-lockup">
-          <span className="brand-mark">⌁</span>
+          <picture className="brand-logo">
+            <source media="(prefers-color-scheme: dark)" srcSet="/assets/logo-dark.png" />
+            <img src="/assets/logo-light.png" alt="Logo AgroCI+" />
+          </picture>
           <div>
             <p className="brand-name">AgroCI<span>+</span></p>
             <p className="brand-subtitle">Votre compagnon de champ</p>
