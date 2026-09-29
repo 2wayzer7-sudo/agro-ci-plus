@@ -24,7 +24,13 @@ function BottomNav({ pendingCount }) {
               {link.to === '/diagnostic' && pendingCount > 0 && (
                 <span className="nav-badge">{pendingCount}</span>
               )}
-              {isActive && <motion.span layoutId="active-tab" className="active-tab" />}
+              {isActive && (
+                <motion.span
+                  layoutId="active-tab"
+                  className="active-tab"
+                  transition={{ type: 'spring', stiffness: 380, damping: 30, mass: 0.6 }}
+                />
+              )}
             </>
           )}
         </NavLink>

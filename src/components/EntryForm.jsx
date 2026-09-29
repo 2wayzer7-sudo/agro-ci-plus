@@ -31,8 +31,26 @@ function EntryForm({ onSubmit }) {
   return (
     <form className="entry-form leaf-card" onSubmit={handleSubmit}>
       <div className="form-type-toggle" role="group" aria-label="Type d’écriture">
-        <button type="button" className={type === 'expense' ? 'selected expense' : ''} onClick={() => setType('expense')}>Dépense</button>
-        <button type="button" className={type === 'income' ? 'selected income' : ''} onClick={() => setType('income')}>Revenu</button>
+        <button type="button" className={type === 'expense' ? 'selected expense' : ''} onClick={() => setType('expense')}>
+          Dépense
+          {type === 'expense' && (
+            <motion.span
+              layoutId="toggle-glide"
+              className="toggle-glide"
+              transition={{ type: 'spring', stiffness: 420, damping: 32, mass: 0.6 }}
+            />
+          )}
+        </button>
+        <button type="button" className={type === 'income' ? 'selected income' : ''} onClick={() => setType('income')}>
+          Revenu
+          {type === 'income' && (
+            <motion.span
+              layoutId="toggle-glide"
+              className="toggle-glide"
+              transition={{ type: 'spring', stiffness: 420, damping: 32, mass: 0.6 }}
+            />
+          )}
+        </button>
       </div>
       <label>
         Montant (FCFA)

@@ -1,3 +1,4 @@
+import Dexie from 'dexie'
 import { useCallback, useEffect, useState } from 'react'
 import { db } from '../db'
 
@@ -27,8 +28,8 @@ export function useEntries() {
   useEffect(() => {
     loadEntries()
     const handleStorageChange = () => loadEntries()
-    db.on('storagemutated', handleStorageChange)
-    return () => db.on.storagemutated.unsubscribe(handleStorageChange)
+    Dexie.on('storagemutated', handleStorageChange)
+    return () => Dexie.on('storagemutated').unsubscribe(handleStorageChange)
   }, [loadEntries])
 
   const addEntry = useCallback(async (entry) => {

@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
-import { motion } from 'framer-motion'
+import { AnimatePresence, motion } from 'framer-motion'
 import SyncIndicator from '../components/SyncIndicator'
+import ThemeToggle from '../components/ThemeToggle'
 import { useDiagnostics } from '../hooks/useDiagnostics'
+import { adviceSheets } from '../data/advice'
 import { listenForSyncMessages } from '../sync'
 
 function formatDiagnosticDate(timestamp) {
@@ -37,7 +39,8 @@ function DiagnosticScreen() {
   const [note, setNote] = useState('')
   const [isProcessing, setIsProcessing] = useState(false)
   const [message, setMessage] = useState('')
-  const { diagnostics, pendingCount, saveDiagnostic, sendNow, error, reload } = useDiagnostics()
+  const [openSheet, setOpenSheet] = useState(null)
+  const { diagnostics, pendingCount, saveDiagnostic, sendNow, error, notice, reload } = useDiagnostics()
 
   useEffect(() => listenForSyncMessages(reload), [reload])
 
@@ -73,7 +76,10 @@ function DiagnosticScreen() {
           <p className="kicker">Accompagnement du champ</p>
           <h1>Diagnostic maladies</h1>
         </div>
-        <span className="header-leaf">✦</span>
+        <div className="header-cluster">
+          <span className="header-leaf">✦</span>
+          <ThemeToggle />
+        </div>
       </header>
       <p className="screen-description">Photographiez une feuille ou une cabosse pour garder une trace et demander conseil plus tard.</p>
       <SyncIndicator count={pendingCount} />
@@ -91,7 +97,54 @@ function DiagnosticScreen() {
         </label>
       </div>
       {message && <p className="success-message" role="status">{message}</p>}
+      {notice && <p className="success-message" role="status">{notice}</p>}
       {error && <p className="form-error" role="alert">{error}</p>}
+      <div className="section-heading">
+        <div>
+          <span className="eyebrow">Fiches de terrain</span>
+          <h2>Que faire en cas de doute ?</h2>
+        </div>
+        <span className="entry-count">Hors ligne</span>
+      </div>
+      <div className="advice-list">
+        {adviceSheets.map((sheet) => {
+          const isOpen = openSheet === sheet.id
+          return (
+            <article className="advice-card" key={sheet.id}>
+              <button
+                type="button"
+                className="advice-trigger"
+                aria-expanded={isOpen}
+                onClick={() => setOpenSheet(isOpen ? null : sheet.id)}
+              >
+                <span className="advice-glyph" aria-hidden="true">{sheet.icon}</span>
+                <span className="advice-title">
+                  <strong>{sheet.disease}</strong>
+                  <span>{sheet.agent}</span>
+                </span>
+                <span className={`advice-chevron ${isOpen ? 'open' : ''}`} aria-hidden="true">⌄</span>
+              </button>
+              <AnimatePresence initial={false}>
+                {isOpen && (
+                  <motion.div
+                    className="advice-body"
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    transition={{ duration: 0.22, ease: [0.4, 0, 0.6, 1] }}
+                  >
+                    <p className="advice-symptoms"><strong>Signes :</strong> {sheet.symptoms}</p>
+                    <ol className="advice-actions">
+                      {sheet.actions.map((action) => <li key={action}>{action}</li>)}
+                    </ol>
+                    <p className="advice-warning">{sheet.warning}</p>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </article>
+          )
+        })}
+      </div>
       <div className="section-heading">
         <div>
           <span className="eyebrow">Votre historique</span>
