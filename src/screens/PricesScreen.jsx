@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import PriceCard from '../components/PriceCard'
 import ThemeToggle from '../components/ThemeToggle'
 import { db } from '../db'
+import { useNotifications } from '../hooks/useNotifications'
 import { useOnlineStatus } from '../hooks/useOnlineStatus'
 import { usePrices } from '../hooks/usePrices'
 
@@ -15,11 +16,47 @@ function formatAmount(value) {
   return new Intl.NumberFormat('fr-FR').format(value)
 }
 
+/* Libellés des deux actions : traduisent l'état des permissions en texte
+   explicite plutôt qu'en icône seule, pour un utilisateur qui ne voit pas
+   la couleur d'état. */
+function buildNotifyLabel({ supported, status, permission, enabled }) {
+  if (!supported) return '🔔 Alertes indisponibles'
+  if (status === 'pending') return '🔔 Demande en cours…'
+  if (permission === 'denied') return '🔔 Alertes bloquées'
+  return enabled ? '🔔 Alertes prix actives' : '🔔 Activer les alertes prix'
+}
+
+function buildGeoLabel({ supported, status }) {
+  if (!supported) return '📍 GPS indisponible'
+  if (status === 'locating') return '📍 Localisation…'
+  return status === 'resolved' ? '📍 Recalculer ma position' : '📍 Détecter mon marché'
+}
+
 function PricesScreen() {
-  const { prices, lastUpdated, refreshPrices, error } = usePrices()
+  const {
+    prices, location, marketName, availableMarkets, changeLocation,
+    locateNearestMarket, geoSupported, geoStatus, geoMessage,
+    lastUpdated, refreshPrices, error
+  } = usePrices()
+  const {
+    supported: notifySupported, permission, enabled: notifyEnabled, status: notifyStatus,
+    message: notifyMessage, toggleNotifications, notifyMarketChange
+  } = useNotifications()
   const isOnline = useOnlineStatus()
   const [cropId, setCropId] = useState(prices[0]?.id ?? 'cocoa')
   const [weight, setWeight] = useState('')
+
+  /* Alerte sur changement de marché RÉELLEMENT choisi. La ref évite
+     qu'un simple remontage de composant (ou le double montage de
+     React.StrictMode en dev) ne déclenche une notification au premier
+     rendu. */
+  const previousLocation = useRef(location)
+  useEffect(() => {
+    const fromId = previousLocation.current
+    if (fromId === location) return
+    previousLocation.current = location
+    notifyMarketChange(fromId, location)
+  }, [location, notifyMarketChange])
 
   useEffect(() => {
     let active = true
@@ -60,6 +97,12 @@ function PricesScreen() {
   const hasWeight = Number.isFinite(kilos) && kilos > 0
   const total = hasWeight && selected ? Math.round(kilos * selected.price) : 0
 
+  const notifyLabel = buildNotifyLabel({ supported: notifySupported, status: notifyStatus, permission, enabled: notifyEnabled })
+  const geoLabel = buildGeoLabel({ supported: geoSupported, status: geoStatus })
+  const statusMessage =
+    [geoMessage, notifyMessage].filter(Boolean).join(' · ') ||
+    'Astuce : la détection GPS et les alertes fonctionnent sans réseau.'
+
   return (
     <section className="screen prices-screen">
       <header className="screen-header">
@@ -84,9 +127,38 @@ function PricesScreen() {
         <p className="kicker">Mardi 29 septembre</p>
         <h1>Les prix du jour</h1>
         <p className="screen-description">Suivez vos récoltes, même sans réseau.</p>
+        <label className="note-label" htmlFor="market-select">
+          Marché de référence
+          <select id="market-select" value={location} onChange={(event) => changeLocation(event.target.value)}>
+            {availableMarkets.map((market) => (
+              <option key={market.id} value={market.id}>{market.name}</option>
+            ))}
+          </select>
+        </label>
+        <div className="form-grid">
+          <button
+            type="button"
+            className="outline-button"
+            onClick={() => toggleNotifications(location)}
+            disabled={!notifySupported || notifyStatus === 'pending'}
+          >
+            {notifyLabel}
+          </button>
+          <button
+            type="button"
+            className="outline-button"
+            onClick={locateNearestMarket}
+            disabled={!geoSupported || geoStatus === 'locating'}
+          >
+            {geoLabel}
+          </button>
+        </div>
+        <p className="entry-count" role="status">{statusMessage}</p>
       </div>
       <div className="price-list">
-        {prices.map((price, index) => <PriceCard key={price.id} price={price} index={index} />)}
+        {prices.map((price, index) => (
+          <PriceCard key={`${location}-${price.id}`} price={price} marketName={marketName} index={index} />
+        ))}
       </div>
       <motion.section
         className="entry-form leaf-card harvest-calculator"
@@ -139,7 +211,7 @@ function PricesScreen() {
         </div>
         {selected && (
           <p className="entry-count">
-            {selected.crop} à {formatAmount(selected.price)} {selected.unit.replace('/', ' /')} · marché de {selected.location}
+            {selected.crop} à {formatAmount(selected.price)} {selected.unit.replace('/', ' /')} · marché de {marketName}
           </p>
         )}
       </motion.section>

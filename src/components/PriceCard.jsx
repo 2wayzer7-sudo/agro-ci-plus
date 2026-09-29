@@ -1,11 +1,13 @@
 import { motion } from 'framer-motion'
 import { formatPrice } from '../data/prices'
 
-function PriceCard({ price, index }) {
+function PriceCard({ price, marketName, index }) {
   const isUp = price.trend === 'up'
   return (
     <motion.article
-      className={`price-card ${price.id}`}
+      className="price-card"
+      data-crop={price.id}
+      data-market={marketName}
       initial={{ opacity: 0, y: 20, scale: 0.96 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ type: 'spring', stiffness: 260, damping: 18, delay: index * 0.1 }}
@@ -24,7 +26,7 @@ function PriceCard({ price, index }) {
         <span>{price.unit}</span>
       </div>
       <div className="price-card-bottom">
-        <span>Marché de {price.location}</span>
+        <span>Marché de {marketName}</span>
         <span className="price-change">{price.change}</span>
       </div>
     </motion.article>
