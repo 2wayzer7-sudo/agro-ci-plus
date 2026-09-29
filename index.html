@@ -6,14 +6,28 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <script>
       /* Amorçage du thème AVANT le premier paint : évite le flash blanc
-         et garantit que la matière sombre est posée même si le module
-         React est lent. Répète exactement la logique de useTheme(). */
+         et garantit que la matière est posée même si le module React est
+         lent. Répète exactement la logique de useTheme.js :
+           1. l'état initial est 'light' (Papier Tactile) ;
+           2. un choix manuel dans localStorage prime sur le système ;
+           3. sinon, la préférence système tranche.
+         L'ancienne clé 'agroci:theme' est lue puis migrée vers 'theme'. */
       (function () {
+        var STORAGE_KEY = 'theme'
+        var LEGACY_KEY = 'agroci:theme'
         var theme = 'light'
         try {
-          var forced = window.localStorage.getItem('agroci:theme')
-          if (forced === 'light' || forced === 'dark') {
-            theme = forced
+          var stored = window.localStorage.getItem(STORAGE_KEY)
+          if (stored !== 'light' && stored !== 'dark') {
+            var legacy = window.localStorage.getItem(LEGACY_KEY)
+            if (legacy === 'light' || legacy === 'dark') {
+              stored = legacy
+              window.localStorage.setItem(STORAGE_KEY, legacy)
+              window.localStorage.removeItem(LEGACY_KEY)
+            }
+          }
+          if (stored === 'light' || stored === 'dark') {
+            theme = stored
           } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
             theme = 'dark'
           }

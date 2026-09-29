@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "node theme-grid.test.mjs && node theme-parity.test.mjs"
   },
   "dependencies": {
     "dexie": "^4.0.8",

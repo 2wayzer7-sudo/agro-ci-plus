@@ -6,17 +6,12 @@ import App from './App'
 import { applyTheme, resolveTheme } from './hooks/useTheme'
 import './index.css'
 
-/* Reprend l'amorçage d'index.html et écoute le système : le thème suit
-   la préférence en direct, sauf si l'utilisateur l'a verrouillée. */
+/* Reprend l'amorçage d'index.html au cas où le script inline aurait été
+   neutralisé (CSP stricte, extension). L'écoute de la préférence
+   système et le verrouillage par choix manuel sont gérés au niveau du
+   module useTheme : on ne duplique ni l_abonnement ni la lecture du
+   stockage ici, sinon deux écouteurs se désynchroniseraient. */
 applyTheme(resolveTheme())
-window.matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', (event) => {
-  try {
-    if (window.localStorage.getItem('agroci:theme')) return
-  } catch (error) {
-    /* stockage indisponible : on suit le système */
-  }
-  applyTheme(event.matches ? 'dark' : 'light')
-})
 
 /* Le Service Worker n'est enregistré que sur un contexte sécurisé
    (HTTPS, ou localhost en développement). Hors HTTPS, l'app reste
