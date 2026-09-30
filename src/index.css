@@ -704,6 +704,16 @@ textarea:focus, input:focus, select:focus {
 .status { display: inline-block; font-size: 11px; font-weight: 700; }
 .status.pending { color: var(--accent-ink); }
 .status.sent { color: var(--brand-2); }
+/* Envoi réellement parti : ni vert (trop tôt), ni ambre d'attente
+   (trop pessimiste). L'encre neutre suffit — ce sont les points
+   animés de SyncIndicator qui portent le « en cours ». */
+.status.sending { color: var(--text-2); }
+/* Localité de la capture, figée au moment de la photo. */
+.diagnostic-place { display: block; margin-top: 2px; color: var(--text-3); font-size: 11px; font-weight: 700; }
+/* Motif du dernier échec : une photo en attente n'est pas forcément
+   due au réseau, et « pourquoi ça ne part pas ? » doit avoir une
+   réponse affichée. */
+.diagnostic-reason { display: block; margin-top: 3px; color: var(--accent-ink); font-size: 11px; }
 .empty-state {
   padding: 24px 16px;
   color: var(--text-3);
@@ -919,6 +929,233 @@ textarea:focus, input:focus, select:focus {
   .bottom-nav { border-right: var(--edge-w) solid var(--edge); border-left: var(--edge-w) solid var(--edge); }
 }
 
+/* ---------- 7c. CONTRÔLES COMPACTS : une ligne, zéro phrase ----------
+   Marché + géolocalisation tiennent sur UNE seule barre horizontale et la
+   cloche n'occupe plus le flux des prix. L'état de chaque action est
+   porté par la matière et l'icône du bouton, jamais par une ligne de
+   texte. Aucun jeton ajouté : uniquement des var() déjà définies par les
+   deux thèmes. */
+.icon-button {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 auto;
+  place-items: center;
+  padding: 0;
+  color: var(--text-3);
+  background: var(--bg-1);
+  border: var(--edge-w) solid var(--edge);
+  border-radius: 50%;
+  font-size: 16px;
+  line-height: 1;
+  box-shadow: var(--shadow-1), var(--rim);
+  transition: color 320ms var(--spring-soft), background-color 320ms var(--spring-soft), border-color 320ms var(--spring-soft), box-shadow 320ms var(--spring-soft);
+}
+.icon-button:hover { box-shadow: var(--shadow-2), 0 0 0 4px rgb(var(--glow-color) / 0.12); }
+.icon-button.is-idle { color: var(--text-3); }
+.icon-button.is-active, .icon-button.is-resolved { color: var(--brand-2); background: rgb(var(--glow-color) / 0.12); border-color: var(--edge-strong); }
+.icon-button.is-denied, .icon-button.is-unavailable, .icon-button.is-out-of-zone { color: var(--accent-ink); background: var(--accent-soft); }
+.icon-button.is-pending, .icon-button.is-locating { color: var(--accent-ink); background: var(--accent-soft); border-color: var(--accent); animation: pulse-photophore 1.2s var(--spring-soft) infinite; }
+
+/* ---------- 7d. BARRE-LOUPE : une ligne, zéro cadre ----------
+   Le bloc volumineux a disparu : il ne reste qu'un badge de zone et deux
+   icônes. La recherche n'existe que dans un overlay flottant. */
+.market-anchor { position: relative; }
+.zone-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.zone-badge {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  color: var(--brand);
+  background: rgb(var(--glow-color) / 0.1);
+  border: var(--edge-w) solid var(--edge);
+  border-radius: var(--radius-pill);
+  font-size: 13px;
+  font-weight: 800;
+}
+.zone-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.zone-badge.is-out-of-zone, .zone-badge.is-denied, .zone-badge.is-unavailable { color: var(--accent-ink); background: var(--accent-soft); }
+.zone-badge.is-pending, .zone-badge.is-locating { color: var(--accent-ink); background: var(--accent-soft); border-color: var(--accent); }
+.zone-actions { display: flex; flex: 0 0 auto; align-items: center; gap: 6px; }
+/* Rattachement de la ville au hub qui alimente les prix : une seule ligne,
+   discrète, sous le badge. */
+.hub-note { margin: 6px 0 0; color: var(--text-3); font-size: 11px; font-weight: 700; }
+
+/* Overlay : hors flux (position absolute) et au-dessus de tout — les
+   cartes de prix ne se décalent pas d'un pixel à l'ouverture. */
+.search-overlay {
+  position: absolute;
+  z-index: 50;
+  top: calc(100% + 8px);
+  right: 0;
+  left: 0;
+  display: grid;
+  gap: 8px;
+  padding: 8px;
+  background: var(--bg-1);
+  border: var(--edge-w) solid var(--edge-strong);
+  border-radius: var(--radius-m);
+  box-shadow: var(--shadow-3), var(--rim);
+}
+.search-input { min-width: 0; font-size: 14px; }
+
+/* Liste de résultats : elle vit DANS l'overlay, donc dans le flux de
+   celui-ci — plus aucun positionnement propre ici. */
+.combo-menu {
+  display: grid;
+  gap: 2px;
+  max-height: 240px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+.combo-menu[hidden] { display: none; }
+.combo-option {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 10px;
+  color: var(--text-1);
+  border-radius: var(--radius-s);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.combo-tag {
+  margin-left: auto;
+  color: var(--text-3);
+  font-size: 11px;
+  font-weight: 700;
+}
+.combo-option.is-active { color: var(--brand); background: rgb(var(--glow-color) / 0.12); }
+.combo-empty { padding: 9px 10px; color: var(--text-3); font-size: 13px; }
+
+/* ---------- 7e. BANDEAU NATIONAL DÉFILANT ----------
+   Position GPS hors bassin de collecte : le prix appliqué est le barème
+   national. Deux copies du texte + un padding par copie : à -50% de la
+   piste, la seconde est exactement là où était la première, donc la
+   boucle est invisible. */
+.ticker {
+  display: flex;
+  align-items: center;
+  margin-top: 10px;
+  padding: 8px 0;
+  overflow: hidden;
+  color: var(--accent-ink);
+  background: var(--accent-soft);
+  border: var(--edge-w) solid var(--edge);
+  border-radius: var(--radius-pill);
+  font-size: 12px;
+  font-weight: 700;
+}
+.ticker-track { display: flex; width: max-content; animation: ticker-slide 24s linear infinite; }
+.ticker-item { padding-right: 24px; white-space: nowrap; }
+@keyframes ticker-slide {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+/* ---------- 7f. CALENDRIER SAISONNIER & CONSEILS (cacao / café) ----------
+   Même matière que le reste des cartes : `--card-surface`, encres de
+   marque, aucune couleur propre. Les puces de filtre réutilisent la
+   géométrie des bascules existantes (`.form-type-toggle`). */
+.season-calendar { margin: 22px 0 4px; }
+.season-calendar .section-heading { margin: 0 0 14px; }
+.calendar-glyph {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 auto;
+  place-items: center;
+  color: var(--brand-2);
+  background: rgb(var(--glow-color) / 0.12);
+  border-radius: 50% 50% 50% 6px;
+  font-size: 19px;
+  line-height: 1;
+}
+
+.daily-tip {
+  display: grid;
+  gap: 5px;
+  padding: 14px;
+  background: linear-gradient(150deg, rgb(var(--glow-color) / 0.14), rgb(var(--glow-color) / 0.04));
+  border: var(--edge-w) solid var(--edge-strong);
+  border-radius: 17px 17px 17px 5px;
+  box-shadow: var(--shadow-1);
+}
+.daily-tip .eyebrow { margin-bottom: 0; }
+.daily-tip strong { color: var(--brand); font-size: 15px; }
+.daily-tip p { margin: 0; color: var(--text-2); font-size: 13px; line-height: 1.5; }
+
+.chip-row { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 12px; }
+.chip {
+  min-height: 34px;
+  padding: 6px 12px;
+  color: var(--text-3);
+  background: var(--bg-inset);
+  border: var(--edge-w) solid var(--edge);
+  border-radius: var(--radius-pill);
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.chip.is-selected { color: var(--on-brand-ink); background: var(--brand-2); border-color: var(--brand-2); }
+
+.calendar-list { display: grid; gap: 10px; margin: 14px 0 0; padding: 0; list-style: none; }
+.calendar-item {
+  display: grid;
+  gap: 4px;
+  padding: 12px 13px;
+  background: linear-gradient(150deg, var(--bg-1), var(--bg-2));
+  border: var(--edge-w) solid var(--edge);
+  border-radius: 15px 15px 15px 4px;
+  box-shadow: var(--shadow-1);
+}
+.calendar-item-head { display: flex; align-items: center; gap: 9px; }
+.calendar-item-head strong { font-size: 14px; }
+.calendar-item p { margin: 0; color: var(--text-2); font-size: 13px; line-height: 1.5; }
+.calendar-period { color: var(--accent-ink); font-size: 11px; font-weight: 800; }
+.crop-tag {
+  margin-left: auto;
+  padding: 3px 9px;
+  color: var(--brand-2);
+  background: rgb(var(--glow-color) / 0.12);
+  border-radius: var(--radius-pill);
+  font-size: 10px;
+  font-weight: 800;
+}
+.crop-tag.is-cafe { color: var(--accent-ink); background: var(--accent-soft); }
+
+.reminder-row { display: grid; gap: 6px; margin-top: 14px; }
+.reminder-row .entry-count { margin: 0; }
+
+@media (max-width: 380px) {
+  /* Filet de sécurité : la marque peut céder avant de faire passer le
+     cluster sur une seconde ligne. */
+  .screen-header { flex-wrap: wrap; }
+  .brand-subtitle { display: none; }
+  /* le mot quitte l'écran, la pastille reste lisible (mêmes valeurs que
+     .visually-hidden) */
+  .offline-pill .pill-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+}
+
 /* ---------- 8. CONFORT PHYSIOLOGIQUE ---------- */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
@@ -929,6 +1166,11 @@ textarea:focus, input:focus, select:focus {
   }
   .ripple { display: none; }
   body::before { opacity: 0.5; }
+  /* le bandeau redevient un texte statique, lisible d'un bloc */
+  .ticker { overflow: visible; }
+  .ticker-track { width: auto; animation: none; flex-wrap: wrap; }
+  .ticker-item { white-space: normal; }
+  .ticker-item + .ticker-item { display: none; }
 }
 
 @media (prefers-contrast: more) {

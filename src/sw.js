@@ -1,13 +1,34 @@
 import { clientsClaim } from 'workbox-core'
-import { precacheAndRoute } from 'workbox-precaching'
+import { cleanupOutdatedCaches, createHandlerBoundToURL, precacheAndRoute } from 'workbox-precaching'
 import { NavigationRoute, registerRoute } from 'workbox-routing'
-import { createHandlerBoundToURL } from 'workbox-precaching'
 
 self.skipWaiting()
 clientsClaim()
 precacheAndRoute(self.__WB_MANIFEST)
-registerRoute(new NavigationRoute(createHandlerBoundToURL('/index.html')))
 
+/* Purge les caches de précache issus d'un ancien déploiement (workbox < v5
+   nommait son cache autrement). Sans cet appel, `cleanupOutdatedCaches` de
+   vite.config.js ne serait jamais exécuté : voir la note du bloc `workbox`
+   dans ce fichier — en stratégie `injectManifest`, le plugin ne le lit pas.
+   Le cache obsolète resterait alors sur l'appareil, indéfiniment. */
+cleanupOutdatedCaches()
+
+/* Navigation servie depuis le précache (l'app est une SPA : toute route
+   inexistante doit rendre index.html).
+   La liste d'exclusion est donc ce qui décide entre « page de l'app » et
+   « vrai contenu du serveur », et elle doit vivre ICI : en stratégie
+   `injectManifest`, le plugin ignore `workbox.navigateFallbackDenylist`.
+   Sans elle :
+     - un lien de photo de diagnostic ouvert depuis Slack
+       (/api/diagnostic-photo?key=…) renvoyait l'accueil au lieu de l'image ;
+     - un asset (/assets/…) renvoyait l'accueil au lieu du fichier. */
+const NAVIGATION_DENYLIST = [/^\/api\//, /^\/assets\/.*\.[a-z0-9]{2,5}$/]
+registerRoute(new NavigationRoute(createHandlerBoundToURL('/index.html'), { denylist: NAVIGATION_DENYLIST }))
+
+/* Reprise de l'envoi en arrière-plan. Ce worker n'a pas Dexie : il réveille
+   les fenêtres ouvertes, qui vident la file avec le code complet. LIMITATION
+   assumée : application fermée, aucune fenêtre à réveiller → la file attend la
+   prochaine ouverture (que useDiagnostics relance immédiatement). */
 self.addEventListener('sync', (event) => {
   if (event.tag !== 'sync-diagnostics') return
   event.waitUntil(
@@ -84,10 +105,29 @@ self.addEventListener('notificationclick', (event) => {
   event.notification.close()
   const targetUrl = new URL(event.notification.data?.url ?? '/', self.location.origin).href
 
+  const isSameOrigin = (client) => {
+    try {
+      return new URL(client.url).origin === self.location.origin
+    } catch {
+      return false
+    }
+  }
+
   event.waitUntil(
     self.clients
       .matchAll({ type: 'window', includeUncontrolled: true })
-      .then((clientList) => clientList.find((client) => new URL(client.url).origin === self.location.origin))
+      .then((clientList) => {
+        const windows = clientList.filter(isSameOrigin)
+        if (windows.length === 0) return null
+        /* Onglet déjà sur la bonne page : il suffit de le ramener devant,
+           sans navigation (donc sans rechargement complet). À défaut, on
+           réveille l'onglet visible plutôt qu'un onglet de fond. */
+        return (
+          windows.find((client) => client.url === targetUrl) ??
+          windows.find((client) => client.focused) ??
+          windows[0]
+        )
+      })
       .then((existingClient) => {
         if (!existingClient) return self.clients.openWindow(targetUrl)
         if ('navigate' in existingClient) return existingClient.navigate(targetUrl).then((navigated) => navigated ?? existingClient)

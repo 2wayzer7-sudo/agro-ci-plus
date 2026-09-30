@@ -3,6 +3,11 @@
    en priorité, la règle ne s'applique qu'en dernier ressort. */
 /*    /index.html   200
 
+# ⚠️ Ce fichier est IGNORÉ dès que netlify.toml contient des règles
+# [[redirects]] : Netlify donne la priorité au fichier de configuration.
+# La règle /api/send-diagnostic ET le fallback SPA vivent donc dans
+# netlify.toml — ne pas les dupliquer ici, elles seraient sans effet.
+
 # Service Worker : jamais de cache court, toujours revalidé
 /sw.js
   Cache-Control: no-cache, no-store, must-revalidate

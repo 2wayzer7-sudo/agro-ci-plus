@@ -15,6 +15,12 @@ export default defineConfig({
         name: 'AgroCI+',
         short_name: 'AgroCI+',
         description: 'Le compagnon numérique des planteurs de cacao et de café.',
+        /* Identité de l'application installée. Sans `id`, le navigateur
+           déduit l'identité de `start_url` : un simple ajustement de
+           `start_url` ferait de l'application mise à jour une application
+           différente (nouvelle icône dans le tiroir, app installée
+           « perdue »). Laissé fixe, il verrouille l'identité. */
+        id: '/',
         start_url: '/',
         scope: '/',
         display: 'standalone',
@@ -49,9 +55,9 @@ export default defineConfig({
         ]
       },
       // ATTENTION : en stratégie `injectManifest`, le plugin ne lit PAS
-      // `workbox` pour construire le precache — il lit `injectManifest`.
-      // C'est pour ça que des globPatterns placés dans `workbox` étaient
-      // silencieusement ignorés (9 entrées, 0 logo clair).
+      // `workbox` pour construire le précache — il ne lit QUE
+      // `injectManifest`. C'est pour ça que des globPatterns placés dans
+      // `workbox` étaient silencieusement ignorés (9 entrées, 0 logo clair).
       // Les icônes du manifest sont déjà couvertes par globPatterns :
       // les laisser ajouterait une seconde fois les mêmes entrées
       // (via additionalManifestEntries), soit 5 doublons au precache.
@@ -69,14 +75,35 @@ export default defineConfig({
         globIgnores: ['**/node_modules/**/*', 'assets/logos-source/**', 'manifest.webmanifest'],
         // Les PNG 512 masqués pèsent ~180 Ko : marge par défaut relevée.
         maximumFileSizeToCacheInBytes: 4 * 1024 * 1024
-      },
-      workbox: {
-        cleanupOutdatedCaches: true,
-        navigateFallback: 'index.html',
-        navigateFallbackDenylist: [/^\/api\//, /^\/assets\/.*\.[a-z0-9]{2,5}$/],
-        clientsClaim: true,
-        skipWaiting: true
       }
+      /* PAS DE BLOC `workbox` ICI, et c'est volontaire.
+         En stratégie `injectManifest`, workbox-build appelle `injectManifest()`,
+         qui n'honore ni `navigateFallback`, ni `navigateFallbackDenylist`, ni
+         `cleanupOutdatedCaches`, ni `clientsClaim`/`skipWaiting` : ces options
+         n'ont d'effet qu'avec la stratégie `generateSW`. Les écrire ici
+         donnerait l'illusion d'un réglage appliqué — c'est exactement le piège
+         qui a produit la liste d'exclusion absente de src/sw.js (les liens de
+         photo de diagnostic ouvraient l'accueil au lieu de l'image).
+         Les équivalents sont dans le code, où ils s'exécutent vraiment :
+           - skipWaiting() / clientsClaim()      → src/sw.js
+           - navigation de repli + liste d'exclusion → src/sw.js (NavigationRoute)
+           - cleanupOutdatedCaches()             → src/sw.js */
     })
-  ]
+  ],
+
+  /* Découpe des bibliothèques. Le Service Worker précache tout, donc l'intérêt
+     n'est pas le cache HTTP mais le poids re-téléchargé à chaque déploiement :
+     une correction dans `src/` ne redownload plus React, le routeur ni le
+     moteur d'animation, seulement le chunk applicatif. */
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          react: ['react', 'react-dom', 'react-router-dom'],
+          motion: ['framer-motion'],
+          db: ['dexie']
+        }
+      }
+    }
+  }
 })

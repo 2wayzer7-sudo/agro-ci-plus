@@ -19,3 +19,6 @@ npm-ci.log
 
 # Journal du serveur de prévisualisation local
 preview.log
+
+# netlify.toml reste versionné (déploiement) ; le lien local, jamais
+.netlify/

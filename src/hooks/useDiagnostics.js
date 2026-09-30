@@ -1,7 +1,9 @@
 import Dexie from 'dexie'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { db } from '../db'
-import { registerDiagnosticsSync } from '../sync'
+import { useOnlineStatus } from './useOnlineStatus'
+import { recoverInterruptedSends, registerDiagnosticsSync, sendDiagnostics } from '../sync'
+import { DIAGNOSTIC_STATUS, IA_UNAVAILABLE } from '../services/diagnosticService'
 
 /* Garde-fou quota : on refuse d'écrire une photo si le navigateur ne peut
    plus garantir la sauvegarde, et on dégage l'espace en retirant les
@@ -14,12 +16,22 @@ const MIN_FREE_BYTES = 3 * 1024 * 1024
 const MAX_IMAGE_EDGE = 1024
 const JPEG_QUALITY = 0.7
 
+/* Fenêtre de regroupement des relectures déclenchées par les écritures
+   d'IndexedDB. Assez long pour absorber un flush complet, assez court pour
+   que l'interface reste perçue comme immédiate. */
+const STORAGE_RELOAD_DELAY = 300
+
 const QUOTA_MESSAGES = {
   insufficient: 'Le stockage de cet appareil est plein. Envoyez vos diagnostics en attente puis réessayez.',
   evicted: 'Le stockage était plein : d’anciens diagnostics déjà envoyés ont été supprimés pour libérer de l’espace.',
   failed: 'La photo n’a pas pu être sauvegardée.',
   unreadable: 'Cette photo n’a pas pu être lue. Choisissez-en une autre.'
 }
+
+/* Messages d'envoi : distincts selon la cause, pour ne jamais annoncer
+   une transmission qui n'a pas eu lieu. */
+const DEFERRED_MESSAGE = 'Pas de connexion : l’envoi est programmé et partira automatiquement au retour du réseau.'
+const UNEXPECTED_MESSAGE = 'L’envoi a été interrompu. Vos photos restent enregistrées en attente.'
 
 function isQuotaError(error) {
   if (!error) return false
@@ -102,26 +114,88 @@ export function useDiagnostics() {
   const [diagnostics, setDiagnostics] = useState([])
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  const [message, setMessage] = useState('')
+  const [isSending, setIsSending] = useState(false)
+  /* Verrous en ref : ni l'un ni l'autre ne doit provoquer un rendu, et
+     l'autre doit être lisible depuis un callback (flush réseau). */
+  const sendingRef = useRef(false)
+  /* Lectures et relectures de la table : voir `loadDiagnostics` et
+     l'abonnement `storagemutated` plus bas. */
+  const loadingRef = useRef(false)
+  const reloadTimer = useRef(null)
+  const isOnline = useOnlineStatus()
+  const isOnlineRef = useRef(isOnline)
+  isOnlineRef.current = isOnline
 
   const loadDiagnostics = useCallback(async () => {
+    /* Une seule lecture à la fois : deux relectures qui se chevauchent
+       s'écrivent dans l'ordre de leur FIN, pas de leur DÉBUT — un résultat
+       ancien peut donc écraser un résultat plus récent. */
+    if (loadingRef.current) return
+    loadingRef.current = true
     try {
       const items = await db.diagnostics.orderBy('createdAt').reverse().toArray()
       setDiagnostics(items)
       setError('')
     } catch {
       setError('Les diagnostics ne peuvent pas être chargés. Réessayez.')
+    } finally {
+      loadingRef.current = false
     }
   }, [])
 
   useEffect(() => {
+    /* Session précédente interrompue au milieu d'un envoi : ces photos
+       redeviennent envoyables, sinon l'écran afficherait « Traitement en
+       cours » pour toujours. */
+    recoverInterruptedSends().then(() => loadDiagnostics())
     loadDiagnostics()
     requestPersistentStorage()
-    const handleStorageChange = () => loadDiagnostics()
-    Dexie.on('storagemutated', handleStorageChange)
-    return () => Dexie.on('storagemutated').unsubscribe(handleStorageChange)
+
+    /* `storagemutated` se déclenche sur CHAQUE écriture de la table, y
+       compris celles du flush en cours (2 écritures par photo). Chacune
+       déclenchait une relecture complète — donc le rechargement de tous
+       les blobs, plusieurs dizaines de Mo pour un carnet fourni — et un
+       rendu de la liste à chaque fois. Sur un téléphone d'entrée de gamme,
+       c'était le principal poste de lenteur de l'écran Diagnostic.
+       Regroupé sur une courte fenêtre : le même état final, une seule
+       lecture, un seul rendu. */
+    const scheduleReload = () => {
+      if (reloadTimer.current) return
+      reloadTimer.current = setTimeout(() => {
+        reloadTimer.current = null
+        loadDiagnostics()
+      }, STORAGE_RELOAD_DELAY)
+    }
+
+    Dexie.on('storagemutated', scheduleReload)
+    return () => {
+      Dexie.on('storagemutated').unsubscribe(scheduleReload)
+      if (reloadTimer.current) {
+        clearTimeout(reloadTimer.current)
+        reloadTimer.current = null
+      }
+    }
   }, [loadDiagnostics])
 
-  const saveDiagnostic = useCallback(async ({ image, note }) => {
+  /* Synchronisation automatique : le passage hors ligne -> en ligne vide
+     la file sans intervention du planteur, qui n'a rien demandé et
+     souvent pas de réseau au moment de la photo. Le flush est aussi
+     enregistré en Background Sync pour les cas où l'onglet est fermé. */
+  useEffect(() => {
+    if (!isOnline || sendingRef.current) return
+    sendDiagnostics()
+      .then((result) => {
+        if (result.sent > 0) {
+          setMessage(`Connexion rétablie : ${result.sent} diagnostic${result.sent > 1 ? 's' : ''} transmis.`)
+        }
+      })
+      .catch(() => {
+        /* le flush est réessayé au prochain passage en ligne */
+      })
+  }, [isOnline])
+
+  const saveDiagnostic = useCallback(async ({ image, note, location, aiResult }) => {
     let stored = null
     try {
       stored = await normalizeImage(image)
@@ -133,8 +207,15 @@ export function useDiagnostics() {
     const payload = {
       image: stored,
       note: note.trim(),
-      status: 'pending',
-      createdAt: Date.now()
+      /* Localité et pré-diagnostic sont figés AU MOMENT de la capture : le
+         planteur peut changer de ville ensuite, le diagnostic doit rester
+         rattaché à ce qu'il a réellement photographié. */
+      location: (location ?? '').trim(),
+      aiResult: aiResult ?? IA_UNAVAILABLE,
+      status: DIAGNOSTIC_STATUS.PENDING,
+      createdAt: Date.now(),
+      attempts: 0,
+      lastError: ''
     }
 
     try {
@@ -178,13 +259,35 @@ export function useDiagnostics() {
   }, [loadDiagnostics])
 
   const sendNow = useCallback(async () => {
+    /* Un seul envoi à la fois : deux clics rapides ne doivent pas
+       doubler la requête. Le verrou est une ref pour ne pas provoquer
+       de rendu supplémentaire. */
+    if (sendingRef.current) return { success: false, error: 'Un envoi est déjà en cours.' }
+    sendingRef.current = true
+    setIsSending(true)
     try {
-      await registerDiagnosticsSync()
-      return { success: true }
+      if (!isOnlineRef.current) {
+        /* Pas de réseau : la file est confiée au Service Worker, qui
+           reprendra au retour de la connexion. */
+        await registerDiagnosticsSync()
+        return { success: true, deferred: true, error: DEFERRED_MESSAGE }
+      }
+      const result = await sendDiagnostics()
+      if (result.sent > 0) {
+        setMessage(
+          result.pending > 0
+            ? `Diagnostic transmis. ${result.pending} photo${result.pending > 1 ? 's' : ''} restent en attente.`
+            : 'Diagnostic transmis à l’équipe.'
+        )
+      }
+      if (result.error) setError(result.error)
+      return { success: result.sent > 0, sent: result.sent, pending: result.pending, error: result.error }
     } catch {
-      const message = 'L’envoi sera réessayé dès que possible.'
-      setError(message)
-      return { success: false, error: message }
+      setError(UNEXPECTED_MESSAGE)
+      return { success: false, error: UNEXPECTED_MESSAGE }
+    } finally {
+      sendingRef.current = false
+      setIsSending(false)
     }
   }, [])
 
@@ -192,9 +295,16 @@ export function useDiagnostics() {
 
   return {
     diagnostics,
-    pendingCount: diagnostics.filter((item) => item.status === 'pending').length,
+    /* « En attente » = rien n'est parti et rien ne bouge. Un envoi en
+       cours est compté à part : sinon le compteur annoncerait 0 pendant
+       que la photo est déjà partie. */
+    pendingCount: diagnostics.filter((item) => item.status === DIAGNOSTIC_STATUS.PENDING).length,
+    sendingCount: diagnostics.filter((item) => item.status === DIAGNOSTIC_STATUS.SENDING).length,
     saveDiagnostic,
     sendNow,
+    isSending,
+    message,
+    clearMessage: useCallback(() => setMessage(''), []),
     error,
     notice,
     clearNotice,

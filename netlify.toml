@@ -1,7 +1,23 @@
 [build]
   command = "npm run build"
   publish = "dist"
+  # Dossier des fonctions : `netlify/functions/send-diagnostic.js`.
+  # Le réglage ci-dessous est explicite (le défaut Netlify est déjà ce
+  # dossier) pour que le chemin ne dépende d'aucun réglage de l'UI.
+  functions = "netlify/functions"
 
+# Relais Slack. DOIT précéder le fallback SPA `/*` ci-dessous : les règles
+# sont évaluées dans l'ordre, la première correspondance gagne, donc une
+# règle générique placée avant absorberait /api/send-diagnostic et
+# renverrait index.html (200 HTML) au lieu de la fonction.
+[[redirects]]
+  from = "/api/send-diagnostic"
+  to = "/.netlify/functions/send-diagnostic"
+  status = 200
+
+# Fallback SPA : en dernier ressort, pour que /carnet, /diagnostic et les
+# routes inconnues soient servies par index.html. Les fichiers réels
+# (assets, sw.js, manifest) sont servis en priorité.
 [[redirects]]
   from = "/*"
   to = "/index.html"

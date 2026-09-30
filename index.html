@@ -40,8 +40,15 @@
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#F6F4F0" />
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#1B4332" />
     <meta name="description" content="AgroCI+ accompagne les planteurs de cacao et de café en Côte d'Ivoire." />
-    <link rel="icon" media="(prefers-color-scheme: light)" href="/assets/logo-light.png" type="image/png" />
-    <link rel="icon" media="(prefers-color-scheme: dark)" href="/assets/logo-dark.png" type="image/png" />
+    <!-- Favicons : variants 192 px, pas 512 px. Un onglet dessine 16 à 32 px ;
+         les fichiers 512 px (233 Ko + 252 Ko) étaient téléchargés pour être
+         réduits d'un facteur 16. La version 192 est encore 6 à 12 fois plus
+         grande que la taille d'affichage, donc indiscernable. -->
+    <link rel="icon" media="(prefers-color-scheme: light)" href="/assets/logo-light-192.png" type="image/png" />
+    <link rel="icon" media="(prefers-color-scheme: dark)" href="/assets/logo-dark-192.png" type="image/png" />
+    <!-- iOS n'utilise pas le favicon : sans cet élément, l'ajout à l'écran
+         d'accueil capture la page au lieu d'utiliser le logo. -->
+    <link rel="apple-touch-icon" href="/assets/logo-dark-192.png" />
     <title>AgroCI+ · Votre compagnon de champ</title>
   </head>
   <body>
