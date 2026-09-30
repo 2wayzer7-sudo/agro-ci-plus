@@ -1,2 +1,21 @@
-/api/send-diagnostic  /.netlify/functions/send-diagnostic  200
-/*                     /index.html                           200
+/* SPA fallback : toute route inconnue est servie par index.html (200).
+   Les fichiers réels (assets, sw.js, manifest.webmanifest) sont servis
+   en priorité, la règle ne s'applique qu'en dernier ressort. */
+/*    /index.html   200
+
+# ⚠️ Ce fichier est IGNORÉ dès que netlify.toml contient des règles
+# [[redirects]] : Netlify donne la priorité au fichier de configuration.
+# La règle /api/send-diagnostic ET le fallback SPA vivent donc dans
+# netlify.toml — ne pas les dupliquer ici, elles seraient sans effet.
+
+# Service Worker : jamais de cache court, toujours revalidé
+/sw.js
+  Cache-Control: no-cache, no-store, must-revalidate
+
+# Le manifest peut être mis en cache long
+/manifest.webmanifest
+  Cache-Control: public, max-age=3600
+
+# Les assets hachés par Vite sont immuables
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
