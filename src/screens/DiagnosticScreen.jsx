@@ -1,12 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
+import { motion } from 'framer-motion'
 import SyncIndicator from '../components/SyncIndicator'
 import ThemeToggle from '../components/ThemeToggle'
 import { useDiagnostics } from '../hooks/useDiagnostics'
 import { usePrices } from '../hooks/usePrices'
-import { adviceSheets } from '../data/advice'
 import { listenForSyncMessages } from '../sync'
 import { DIAGNOSTIC_STATUS, IA_UNAVAILABLE } from '../services/diagnosticService'
+
+/* Les « fiches de terrain » (src/data/advice.js) ne sont plus rendues ici :
+   l'écran ne sert plus qu'à photographier et suivre ses envois. Le contenu
+   reste dans le dépôt — le retirer de l'UI n'est pas le supprimer. */
 
 function formatDiagnosticDate(timestamp) {
   return new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).format(timestamp)
@@ -74,7 +77,6 @@ function DiagnosticScreen() {
   const [note, setNote] = useState('')
   const [isProcessing, setIsProcessing] = useState(false)
   const [message, setMessage] = useState('')
-  const [openSheet, setOpenSheet] = useState(null)
   const { diagnostics, pendingCount, sendingCount, saveDiagnostic, sendNow, isSending, message: sendMessage, error, notice, reload } = useDiagnostics()
   /* La localité vient du hook prix : c'est la ville que le planteur a
      lui-même déclarée, exactement celle affichée dans le badge. */
@@ -148,52 +150,6 @@ function DiagnosticScreen() {
       {sendMessage && <p className="success-message" role="status">{sendMessage}</p>}
       {notice && <p className="success-message" role="status">{notice}</p>}
       {error && <p className="form-error" role="alert">{error}</p>}
-      <div className="section-heading">
-        <div>
-          <span className="eyebrow">Fiches de terrain</span>
-          <h2>Que faire en cas de doute ?</h2>
-        </div>
-        <span className="entry-count">Hors ligne</span>
-      </div>
-      <div className="advice-list">
-        {adviceSheets.map((sheet) => {
-          const isOpen = openSheet === sheet.id
-          return (
-            <article className="advice-card" key={sheet.id}>
-              <button
-                type="button"
-                className="advice-trigger"
-                aria-expanded={isOpen}
-                onClick={() => setOpenSheet(isOpen ? null : sheet.id)}
-              >
-                <span className="advice-glyph" aria-hidden="true">{sheet.icon}</span>
-                <span className="advice-title">
-                  <strong>{sheet.disease}</strong>
-                  <span>{sheet.agent}</span>
-                </span>
-                <span className={`advice-chevron ${isOpen ? 'open' : ''}`} aria-hidden="true">⌄</span>
-              </button>
-              <AnimatePresence initial={false}>
-                {isOpen && (
-                  <motion.div
-                    className="advice-body"
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    exit={{ opacity: 0, height: 0 }}
-                    transition={{ duration: 0.22, ease: [0.4, 0, 0.6, 1] }}
-                  >
-                    <p className="advice-symptoms"><strong>Signes :</strong> {sheet.symptoms}</p>
-                    <ol className="advice-actions">
-                      {sheet.actions.map((action) => <li key={action}>{action}</li>)}
-                    </ol>
-                    <p className="advice-warning">{sheet.warning}</p>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </article>
-          )
-        })}
-      </div>
       <div className="section-heading">
         <div>
           <span className="eyebrow">Votre historique</span>
