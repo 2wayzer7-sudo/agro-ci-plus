@@ -1,0 +1,17 @@
+# En-têtes HTTP du site. Ce fichier était auparavant SIMULÉ dans
+# public/_redirects — une syntaxe que `_redirects` ne connaît pas :
+# les lignes étaient ignorées. Ici, c'est le format prévu par Netlify.
+
+# Service Worker : jamais de cache, toujours revalidé. Un ancien SW
+# servi depuis le cache garderait les anciens bugs (fallback de
+# navigation, purge de cache) après chaque correctif.
+/sw.js
+  Cache-Control: no-cache, no-store, must-revalidate
+
+# Le manifest peut être mis en cache long.
+/manifest.webmanifest
+  Cache-Control: public, max-age=3600
+
+# Les assets hachés par Vite sont immuables.
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
