@@ -1,21 +1,16 @@
-/* SPA fallback : toute route inconnue est servie par index.html (200).
-   Les fichiers réels (assets, sw.js, manifest.webmanifest) sont servis
-   en priorité, la règle ne s'applique qu'en dernier ressort. */
-/*    /index.html   200
-
-# ⚠️ Ce fichier est IGNORÉ dès que netlify.toml contient des règles
-# [[redirects]] : Netlify donne la priorité au fichier de configuration.
-# La règle /api/send-diagnostic ET le fallback SPA vivent donc dans
-# netlify.toml — ne pas les dupliquer ici, elles seraient sans effet.
-
-# Service Worker : jamais de cache court, toujours revalidé
-/sw.js
-  Cache-Control: no-cache, no-store, must-revalidate
-
-# Le manifest peut être mis en cache long
-/manifest.webmanifest
-  Cache-Control: public, max-age=3600
-
-# Les assets hachés par Vite sont immuables
-/assets/*
-  Cache-Control: public, max-age=31536000, immutable
+# ⚠️ NE PAS remettre de fallback SPA (`/* /index.html 200`) ici.
+#
+# Contrairement à une idée répandue, Netlify traite les règles de
+# `_redirects` AVANT celles de `netlify.toml` (première correspondance
+# gagne). Un `/*` placé ici interceptait donc /api/send-diagnostic AVANT
+# la règle `netlify.toml` qui le réécrit vers la fonction : le client
+# recevait index.html (200 HTML) au lieu du relais Slack, concluait que
+# le relais était absent et n'envoyait plus aucune photo.
+#
+# Le fallback SPA vit dans netlify.toml, APRÈS la règle /api/send-diagnostic :
+# c'est le seul endroit où l'ordre garantit que la fonction gagne.
+#
+# Les en-têtes Cache-Control ont déménagé dans `public/_headers` : la
+# syntaxe d'en-têtes utilisée ici auparavant n'existait pas dans
+# `_redirects` (les lignes étaient ignorées, voire invalidaient le
+# fichier selon le parseur).
