@@ -32,7 +32,11 @@ export function contentTypeFor(key) {
 }
 
 export function buildPhotoKey(subtype) {
-  const uuid = globalThis.crypto?.randomUUID?.() ?? '0000000-0000-4000-8000-000000000000'
+  /* Le repli DOIT respecter KEY_PATTERN : l'ancienne valeur n'avait que
+     7 chiffres dans le premier groupe, donc une clé produite sans
+     `crypto.randomUUID` était refusée par `diagnostic-photo` (400) —
+     Slack recevait une URL d'image morte. */
+  const uuid = globalThis.crypto?.randomUUID?.() ?? '00000000-0000-4000-8000-000000000000'
   return `${Date.now()}-${uuid}.${subtype}`
 }
 
